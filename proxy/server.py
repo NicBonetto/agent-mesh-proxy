@@ -1,22 +1,21 @@
-import argparse
 import asyncio
-import json
-import logging
+import uuid
 
 from .config import Config, DownstreamServer, load_config
 from .fallback import FallbackEngine
 from .logger import CallLogger, CallRecord, now_ms
 from .mcp_client import DownstreamError, DownstreamTimeout, call_tool
 from .validator import validate_response
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-log = logging.getLogger("agent-mesh-proxy")
+from .session import SessionStore
 
 class Proxy:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, session_store: SessionStore | None = None):
         self.config = config
         self.logger = CallLogger(config.proxy.log_path)
         self.fallback = FallbackEngine()
+        self.sessions = session_store or SessionStore(
+            str(config.proxy.log_path).rsplit(".", 1)[0] + ".sessions.jsonl"
+        )
 
     def _server_for_tool(self, tool_name: str) -> DownstreamServer:
         for server in self.config.downstream_servers:
@@ -28,7 +27,10 @@ class Proxy:
         self,
         tool_name: str,
         arguments: dict,
-        calling_agent: str | None = None
+        calling_agent: str | None = None,
+        intent: str | None = None,
+        session_id: str | None = None,
+        parent_call_id: str | None = None
     ) -> dict:
         server = self._server_for_tool(tool_name)
         rules = self.config.policy_for(tool_name)
@@ -37,14 +39,20 @@ class Proxy:
         last_error: str | None = None
 
         while True:
+            call_id = str(uuid.uuid4())
+
             if self.fallback.circuit_is_open(server.id, tool_name):
                 self._log(
+                    call_id,
                     tool_name,
                     server.id,
                     calling_agent,
                     0.0,
                     attempt,
                     "circuit_open",
+                    intent,
+                    session_id,
+                    parent_call_id,
                     fallback_action="circuit_open"
                 )
                 open_rule = self.fallback.rule_for_outcome(rules, "circuit_open")
@@ -62,13 +70,19 @@ class Proxy:
                 )
                 if validation.ok:
                     self._log(
+                        call_id,
                         tool_name,
                         server.id,
                         calling_agent,
                         result.latency_ms,
                         attempt,
-                        "success"
+                        "success",
+                        intent,
+                        session_id,
+                        parent_call_id
                     )
+                    if session_id:
+                        self.sessions.append_call(session_id, call_id)
                     return result.data
 
                 last_outcome = "schema_mismatch"
@@ -84,12 +98,16 @@ class Proxy:
             action = rule.action if rule else "fail_fast"
 
             self._log(
+                call_id,
                 tool_name,
                 server.id,
                 calling_agent,
                 latency_ms,
                 attempt,
                 last_outcome,
+                intent,
+                session_id,
+                parent_call_id,
                 fallback_action=action,
                 error=last_error
             )
@@ -109,8 +127,10 @@ class Proxy:
 
             raise RuntimeError(f"Call to {tool_name} on {server.id} failed ({last_outcome}): {last_error}")
 
-    def _log(self, tool, server_id, calling_agent, latency_ms, attempt, outcome, fallback_action=None, error=None):
+    def _log(self, call_id, tool, server_id, calling_agent, latency_ms, attempt, outcome,
+             intent, session_id, parent_call_id, fallback_action=None, error=None):
         self.logger.record(CallRecord(
+            call_id=call_id,
             timestamp=now_ms(),
             tool=tool,
             downstream_server_id=server_id,
@@ -119,7 +139,10 @@ class Proxy:
             attempt=attempt,
             outcome=outcome,
             fallback_action=fallback_action,
-            error=error
+            error=error,
+            intent=intent,
+            session_id=session_id,
+            parent_call_id=parent_call_id
         ))
 
 def _empty_tool():
