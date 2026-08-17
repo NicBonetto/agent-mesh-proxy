@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 @dataclass
 class CallRecord:
+    call_id: str
     timestamp: float
     tool: str
     downstream_server_id: str
@@ -18,6 +19,9 @@ class CallRecord:
     request_preview: Optional[str] = None
     response_preview: Optional[str] = None
     error: Optional[str] = None
+    intent: Optional[str] = None
+    session_id: Optional[str] = None
+    parent_call_id: Optional[str] = None
 
 class CallLogger:
     def __init__(self, log_path: str | Path):
@@ -49,7 +53,7 @@ def score(records: list[dict[str, Any]], tool: Optional[str] = None) -> dict[str
 
     return {
         "count": len(rows),
-        "success_rate": round(len(sucesses) / len(rows), 4),
+        "success_rate": round(len(successes) / len(rows), 4),
         "latency_ms_p50": pct(0.50),
         "latency_ms_p95": pct(0.95),
         "latency_ms_mean": round(statistics.mean(latencies), 1),
