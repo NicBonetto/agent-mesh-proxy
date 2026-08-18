@@ -9,7 +9,7 @@ resolution-markers = [
 [[package]]
 name = "agent-mesh-proxy"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "httpx" },
     { name = "jsonschema" },

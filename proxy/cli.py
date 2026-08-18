@@ -87,7 +87,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="agent-mesh-proxy")
     parser.add_argument("--config", default="config.yaml", help="Path to config.yaml")
-    sub = parser.add_subparser(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command", required=True)
 
     p_check = sub.add_parser("config_check", help="Validate config.yaml and prints a summary")
     p_check.set_defaults(func=cmd_config_check)
@@ -95,7 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_call = sub.add_parser("call", help="Make a single ad-hoc call through the proxy")
     p_call.add_argument("tool", help="Tool name to call")
     p_call.add_argument(
-        "--arg", action="append", defaults=[],
+        "--arg", action="append", default=[],
         help="Tool argument as key=value. Repeatable."
     )
     p_call.add_argument("--agent", default="cli", help="calling_agent label for logging")
