@@ -1,6 +1,4 @@
-def main():
-    print("Hello from agent-mesh-proxy!")
-
+from proxy.cli import main as cli_main
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(cli_main())
