@@ -1,0 +1,59 @@
+proxy:
+  name: ""
+  log_path: ""
+
+# Each downstream server the proxy wraps.
+downstream_servers:
+  - id: ""                     # short id, used in logs + policy refs
+    transport: ""        # streamable_http | sse | stdio
+    url: ""   # your Cloud Run MCP endpoint
+    auth:
+      type: ""                    # none | bearer | api_key
+      token_env: ""      # read from env (never put the secret here!)
+    timeout_seconds: 0
+    tools:
+      - name: "example_tool"
+        # Structural schema the response must satisfy. Checked on every call.
+        response_schema:
+          type: object
+          required: []
+          properties:
+            schedule:
+              type: array
+            expected_revenue:
+              type: number
+
+# Fallback policy, per tool. Policies are evaluated in order; first match wins.
+# Supported actions: retry, circuit_break, route_to, fail_fast
+fallback_policies:
+  example_tool:
+    - "on": "timeout"
+      action: "retry"
+      max_attempts: 2
+      backoff: "exponential"          # exponential | fixed
+      backoff_base_seconds: 0.5
+
+    - "on": "schema_mismatch"
+      action: "retry"
+      max_attempts: 1
+
+    - "on": "error"
+      action: "circuit_break"
+      failure_threshold: 5
+      window_seconds: 60
+      cooldown_seconds: 30
+
+    # If you configure a second downstream server for this tool, you can
+    # route to it once the primary is circuit-broken:
+    # - "on": "circuit_open"
+    #   action: "route_to"
+    #   target: "alt-dp-solver"
+
+  default:
+    - "on": "timeout"
+      action: "retry"
+      max_attempts: 1
+      backoff: "fixed"
+      backoff_base_seconds: 1
+    - "on": "error"
+      action: "fail_fast"
