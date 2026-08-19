@@ -54,6 +54,7 @@ def score(records: list[dict[str, Any]], tool: Optional[str] = None) -> dict[str
     return {
         "count": len(rows),
         "success_rate": round(len(successes) / len(rows), 4),
+        "fallback_rate": round(len(fallbacks) / len(rows), 4),
         "latency_ms_p50": pct(0.50),
         "latency_ms_p95": pct(0.95),
         "latency_ms_mean": round(statistics.mean(latencies), 1),

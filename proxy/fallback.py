@@ -8,6 +8,7 @@ from .config import FallbackRule
 class CircuitState:
     failures: deque = field(default_factory=deque) # timestamps of recent failures
     opened_at: float | None = None
+    cooldown_seconds: float = 30.0
 
     def record_failure(self, window_seconds: float) -> None:
         now = time.time()
@@ -16,17 +17,18 @@ class CircuitState:
         while self.failures and self.failures[0] < cutoff:
             self.failures.popleft()
 
-    def is_open(self, cooldown_seconds: float) -> bool:
+    def is_open(self) -> bool:
         if self.opened_at is None:
             return False
-        if time.time() - self.opened_at > cooldown_seconds:
+        if time.time() - self.opened_at > self.cooldown_seconds:
             self.opened_at = None
             self.failures.clear()
             return False
         return True
 
-    def open(self) -> None:
+    def open(self, cooldown_seconds: float) -> None:
         self.opened_at = time.time()
+        self.cooldown_seconds = cooldown_seconds
 
 class FallbackEngine:
     def __init__(self):
@@ -36,7 +38,7 @@ class FallbackEngine:
         return self._circuits.setdefault(key, CircuitState())
 
     def circuit_is_open(self, server_id: str, tool: str) -> bool:
-        return self._circuit(f"{server_id}:{tool}").is_open(cooldown_seconds=30.0)
+        return self._circuit(f"{server_id}:{tool}").is_open()
 
     def rule_for_outcome(self, rules: list[FallbackRule], outcome: str) -> FallbackRule | None:
         for rule in rules:
@@ -48,7 +50,7 @@ class FallbackEngine:
         circuit = self._circuit(f"{server_id}:{tool}")
         circuit.record_failure(rule.window_seconds)
         if len(circuit.failures) >= rule.failure_threshold:
-            circuit.open()
+            circuit.open(rule.cooldown_seconds)
             return True
         return False
 
