@@ -77,11 +77,29 @@ async def call_tool(
 
     latency_ms = (time.monotonic() - start) * 1000
 
-    if getattr(result, "isError", False):
+    if _is_error_result(result):
         raise DownstreamError(f"{server.id}:{tool_name} returned an error result: {result}")
 
     data = _extract_content(result)
     return ToolCallResult(data=data, latency_ms=latency_ms)
+
+def _is_error_result(result: Any) -> bool:
+    for attr in ("isError", "is_error"):
+        val = getattr(result, attr, None)
+        if val is not None:
+            return bool(val)
+        
+    dump = getattr(result, "model_dump", None)
+    if callable(dump):
+        try:
+            data = result.model_dump()
+            for key in ("isError", "is_error"):
+                if key in data:
+                    return bool(data[key])
+        except Exception:
+            pass
+
+    return False
 
 def _extract_content(result: Any) -> Any:
     blocks = getattr(result, "content", None) or []
@@ -96,5 +114,5 @@ def _maybe_json(text: str) -> Any:
     import json
     try:
         return json.loads(text)
-    except (json.JSONDecodError, TypeError):
+    except (json.JSONDecodeError, TypeError):
         return text

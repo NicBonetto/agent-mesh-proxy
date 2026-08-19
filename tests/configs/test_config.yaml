@@ -1,0 +1,38 @@
+proxy:
+  name: "agent-mesh-proxy-test"
+  log_path: "./tests/logs/calls.jsonl"
+
+downstream_servers:
+  - id: "mock-agent"
+    transport: "stdio"
+    command: "python"
+    args: ["tests/integration/mock_agent_server.py"]
+    timeout_seconds: 2
+    tools:
+      - name: "test_tool"
+        response_schema:
+          type: object
+          required: ["status", "value"]
+          properties:
+            status:
+              type: string
+            value:
+              type: number
+
+fallback_policies:
+  test_tool:
+    - "on": "timeout"
+      action: "retry"
+      max_attempts: 2
+      backoff: "fixed"
+      backoff_base_seconds: 0.5
+
+    - "on": "schema_mismatch"
+      action: "retry"
+      max_attempts: 1
+
+    - "on": "error"
+      action: "circuit_break"
+      failure_threshold: 3
+      window_seconds: 30
+      cooldown_seconds: 5

@@ -79,7 +79,8 @@ class Proxy:
                         "success",
                         intent,
                         session_id,
-                        parent_call_id
+                        parent_call_id,
+                        downstream_tokens=_extract_downstream_tokens(result.data)
                     )
                     if session_id:
                         self.sessions.append_call(session_id, call_id)
@@ -115,7 +116,7 @@ class Proxy:
             if last_outcome == "error" and rule and rule.action == "circuit_break":
                 self.fallback.note_failure(server.id, tool_name, rule)
 
-            if rule and rule.action == "retry" and attempt < rule.max_attempts + 1:
+            if rule and rule.action == "retry" and attempt < rule.max_attempts:
                 await asyncio.sleep(self.fallback.backoff_delay(rule, attempt))
                 attempt += 1
                 continue
@@ -128,8 +129,9 @@ class Proxy:
             raise RuntimeError(f"Call to {tool_name} on {server.id} failed ({last_outcome}): {last_error}")
 
     def _log(self, call_id, tool, server_id, calling_agent, latency_ms, attempt, outcome,
-             intent, session_id, parent_call_id, fallback_action=None, error=None):
-        self.logger.record(CallRecord(
+             intent, session_id, parent_call_id, fallback_action=None, error=None,
+             downstream_tokens=None):
+        record = CallRecord(
             call_id=call_id,
             timestamp=now_ms(),
             tool=tool,
@@ -143,7 +145,25 @@ class Proxy:
             intent=intent,
             session_id=session_id,
             parent_call_id=parent_call_id
-        ))
+        )
+
+        if downstream_tokens is not None:
+            record.downstream_input_tokens = downstream_tokens[0]
+            record.downstream_output_tokens = downstream_tokens[1]
+        self.logger.record(record)
+
+def _extract_downstream_tokens(response_data) -> tuple[int | None, int | None] | None:
+    if not isinstance(response_data, dict):
+        return None
+    usage = response_data.get("usage")
+    if not isinstance(usage, dict):
+        return None
+
+    input_tokens = usage.get("input_tokens", usage.get("prompt_tokens"))
+    output_tokens = usage.get("output_tokens", usage.get("completion_tokens"))
+    if input_tokens is None and output_tokens is None:
+        return None
+    return (input_tokens, output_tokens)
 
 def _empty_tool():
     from .config import ToolConfig
