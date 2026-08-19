@@ -6,7 +6,7 @@ downstream_servers:
   - id: "mock-agent"
     transport: "stdio"
     command: "python"
-    args: ["tests/mock_agent_server.py"]
+    args: ["tests/integration/mock_agent_server.py"]
     timeout_seconds: 2
     tools:
       - name: "test_tool"
@@ -21,17 +21,17 @@ downstream_servers:
 
 fallback_policies:
   test_tool:
-    - on: "timeout"
+    - "on": "timeout"
       action: "retry"
       max_attempts: 2
       backoff: "fixed"
       backoff_base_seconds: 0.5
 
-    - on: "schema_mismatch"
+    - "on": "schema_mismatch"
       action: "retry"
       max_attempts: 1
 
-    - on: "error"
+    - "on": "error"
       action: "circuit_break"
       failure_threshold: 3
       window_seconds: 30

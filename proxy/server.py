@@ -116,7 +116,7 @@ class Proxy:
             if last_outcome == "error" and rule and rule.action == "circuit_break":
                 self.fallback.note_failure(server.id, tool_name, rule)
 
-            if rule and rule.action == "retry" and attempt < rule.max_attempts + 1:
+            if rule and rule.action == "retry" and attempt < rule.max_attempts:
                 await asyncio.sleep(self.fallback.backoff_delay(rule, attempt))
                 attempt += 1
                 continue
