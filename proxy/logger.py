@@ -22,6 +22,8 @@ class CallRecord:
     intent: Optional[str] = None
     session_id: Optional[str] = None
     parent_call_id: Optional[str] = None
+    downstream_input_tokens: Optional[int] = None
+    downstream_output_tokens: Optional[int] = None
 
 class CallLogger:
     def __init__(self, log_path: str | Path):
@@ -51,7 +53,7 @@ def score(records: list[dict[str, Any]], tool: Optional[str] = None) -> dict[str
         idx = min(len(latencies) - 1, int(len(latencies) * p))
         return latencies[idx]
 
-    return {
+    result = {
         "count": len(rows),
         "success_rate": round(len(successes) / len(rows), 4),
         "fallback_rate": round(len(fallbacks) / len(rows), 4),
@@ -63,6 +65,15 @@ def score(records: list[dict[str, Any]], tool: Optional[str] = None) -> dict[str
             for outcome in {r["outcome"] for r in rows}
         }
     }
+
+    down_in = [r["downstream_input_tokens"] for r in rows if r.get("downstream_input_tokens") is not None]
+    down_out = [r["downstream_output_tokens"] for r in rows if r.get("downstream_output_tokens") is not None]
+    if down_in or down_out:
+        result["downstream_tokens"] = {
+            "input_total": sum(down_in),
+            "output_total": sum(down_out)
+        }
+    return result
 
 def now_ms() -> float:
     return time.time() * 1000

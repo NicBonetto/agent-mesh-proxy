@@ -62,3 +62,14 @@ def test_score_fallback_rate(tmp_path):
 
 def test_score_empty_records_returns_zero_count():
     assert score([]) == {"count": 0}
+
+def test_score_token_totals_split_by_source(tmp_path):
+    logger = CallLogger(tmp_path / "calls.jsonl")
+
+    logger.record(make_record())
+    result = score(logger.load())
+    assert "downstream_tokens" not in result
+
+    logger.record(make_record(downstream_input_tokens=500, downstream_output_tokens=120))
+    result = score(logger.load())
+    assert result["downstream_tokens"] == {"input_total": 500, "output_total": 120}
