@@ -11,7 +11,7 @@ or more downstream MCP servers, and for every tool call it:
 3. **Validates the response structurally** against a per-tool JSON schema
 4. **Applies fallback policy** on timeout / schema mismatch / error — retry
    with backoff, circuit-break, or route to an alternate downstream server
-5. **Logs every attempt** (JSONL). Outcome, latency, semantic verdict,
+5. **Logs every attempt** (JSONL). Outcome, latency,
    token usage, whether it was part of a multi-hop session
 6. **Ties related calls together** into a session, if the caller says a call
    belongs to one, so a multi-agent delegation chain can eventually be
